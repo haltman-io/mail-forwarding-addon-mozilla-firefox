@@ -113,7 +113,7 @@ That’s the point.
 ## FAQ (aka: dumb questions answered once)
 
 **Q: Why isn’t this listed on the AMO (Addons[.]Mozilla[.]Org)?**  
-**A:** Because Google moves at the speed of a dying mainframe.
+**A:** Because ~~Google~~ Mozilla (joking) moves at the speed of a dying mainframe.
 
 Also:
 - The source code is right here.
