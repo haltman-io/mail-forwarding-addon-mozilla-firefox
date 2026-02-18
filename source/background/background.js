@@ -44,6 +44,10 @@ function normalizeWord(s) {
         .replace(/[^a-z0-9]/g, ""); // <-- also removes "-"
 }
 
+function isValidCustomHandle(handle) {
+    return /^[a-z0-9._-]{1,64}$/.test(String(handle || ""));
+}
+
 async function getApiKey() {
     const res = await browser.storage.local.get(KEY_API_KEY);
     return (res[KEY_API_KEY] || "").trim().toLowerCase();
@@ -56,8 +60,12 @@ async function fetchJson(url, init) {
     try { data = text ? JSON.parse(text) : null; } catch { }
 
     if (!res.ok) {
-        const msg = (data && (data.error || data.message || data.code)) || text || `HTTP ${res.status}`;
-        throw new Error(msg);
+        const code = (data && data.error) || `http_${res.status}`;
+        const err = new Error(code);
+        err.status = res.status;
+        err.code = code;
+        err.data = data;
+        throw err;
     }
     return data;
 }
@@ -90,17 +98,13 @@ async function copyToClipboardBackground(text) {
 
 
 async function createAlias(apiKey, aliasHandle, aliasDomain) {
-    const body = new URLSearchParams();
-    body.set("alias_handle", aliasHandle);
-    body.set("alias_domain", aliasDomain);
-
     const res = await fetch(`${BASE_URL}/api/alias/create`, {
         method: "POST",
         headers: {
             "X-API-Key": apiKey,
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/json"
         },
-        body
+        body: JSON.stringify({ alias_handle: aliasHandle, alias_domain: aliasDomain })
     });
 
     const text = await res.text();
@@ -108,24 +112,25 @@ async function createAlias(apiKey, aliasHandle, aliasDomain) {
     try { data = text ? JSON.parse(text) : null; } catch { }
 
     if (!res.ok) {
-        const msg = (data && (data.error || data.message || data.code)) || text || `HTTP ${res.status}`;
-        throw new Error(msg);
+        const code = (data && data.error) || `http_${res.status}`;
+        const err = new Error(code);
+        err.status = res.status;
+        err.code = code;
+        err.data = data;
+        throw err;
     }
 
     return data;
 }
 
 async function deleteAlias(apiKey, aliasEmail) {
-  const body = new URLSearchParams();
-  body.set("alias", aliasEmail);
-
   const res = await fetch(`${BASE_URL}/api/alias/delete`, {
     method: "POST",
     headers: {
       "X-API-Key": apiKey,
-      "Content-Type": "application/x-www-form-urlencoded"
+      "Content-Type": "application/json"
     },
-    body
+    body: JSON.stringify({ alias: aliasEmail })
   });
 
   const text = await res.text();
@@ -133,8 +138,12 @@ async function deleteAlias(apiKey, aliasEmail) {
   try { data = text ? JSON.parse(text) : null; } catch {}
 
   if (!res.ok) {
-    const msg = (data && (data.error || data.message || data.code)) || text || `HTTP ${res.status}`;
-    throw new Error(msg);
+    const code = (data && data.error) || `http_${res.status}`;
+    const err = new Error(code);
+    err.status = res.status;
+    err.code = code;
+    err.data = data;
+    throw err;
   }
 
   return data;
@@ -210,22 +219,45 @@ function ensureMenu() {
     // });
 }
 
+const DEFAULT_PAGE_LIMIT = 50;
+
 async function listAliasesBg(apiKey) {
-    const res = await fetch(`${BASE_URL}/api/alias/list`, {
-        method: "GET",
-        headers: { "X-API-Key": apiKey }
-    });
+    const allItems = [];
+    let offset = 0;
+    let total = 0;
 
-    const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch { }
+    for (;;) {
+        const url = new URL(`${BASE_URL}/api/alias/list`);
+        url.searchParams.set("limit", String(DEFAULT_PAGE_LIMIT));
+        url.searchParams.set("offset", String(offset));
 
-    if (!res.ok) {
-        const msg = (data && (data.error || data.message || data.code)) || text || `HTTP ${res.status}`;
-        throw new Error(msg);
+        const res = await fetch(url.href, {
+            method: "GET",
+            headers: { "X-API-Key": apiKey }
+        });
+
+        const text = await res.text();
+        let data = null;
+        try { data = text ? JSON.parse(text) : null; } catch { }
+
+        if (!res.ok) {
+            const code = (data && data.error) || `http_${res.status}`;
+            const err = new Error(code);
+            err.status = res.status;
+            err.code = code;
+            err.data = data;
+            throw err;
+        }
+
+        const items = Array.isArray(data?.items) ? data.items : [];
+        allItems.push(...items);
+        total = data?.pagination?.total ?? allItems.length;
+
+        if (items.length < DEFAULT_PAGE_LIMIT || allItems.length >= total) break;
+        offset += DEFAULT_PAGE_LIMIT;
     }
 
-    return data; // array [{address,goto},...]
+    return { items: allItems, total };
 }
 
 async function generateRandomAliasEmail(apiKey) {
@@ -263,6 +295,55 @@ browser.runtime.onMessage.addListener((msg) => {
             return { ok: true };
         }
 
+        // ---------- create credentials (no session required) ----------
+        if (msg.type === "MAM_CREATE_CREDENTIALS") {
+            const email = String(msg.email || "").trim();
+            const days = Number(msg.days) || 30;
+            if (!email) return { ok: false, error: "invalid_params", data: { field: "email" } };
+            if (!Number.isInteger(days) || days < 1 || days > 90) return { ok: false, error: "invalid_params", data: { field: "days" } };
+            try {
+                const res = await fetch(`${BASE_URL}/api/credentials/create`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, days })
+                });
+                const text = await res.text();
+                let data = null;
+                try { data = text ? JSON.parse(text) : null; } catch {}
+                if (!res.ok) {
+                    const code = (data && data.error) || `http_${res.status}`;
+                    return { ok: false, error: code, data };
+                }
+                return { ok: true, data };
+            } catch (e) {
+                return { ok: false, error: e.message || "Network error" };
+            }
+        }
+
+        // ---------- verify key (no session required) ----------
+        if (msg.type === "MAM_VERIFY_KEY") {
+            const key = String(msg.apiKey || "").trim().toLowerCase();
+            if (!key) return { ok: false, error: "No key provided." };
+            try {
+                const url = new URL(`${BASE_URL}/api/alias/list`);
+                url.searchParams.set("limit", "1");
+                url.searchParams.set("offset", "0");
+                const res = await fetch(url.href, {
+                    method: "GET",
+                    headers: { "X-API-Key": key }
+                });
+                if (res.ok) {
+                    return { ok: true, verified: true };
+                }
+                const text = await res.text();
+                let data = null;
+                try { data = text ? JSON.parse(text) : null; } catch {}
+                return { ok: false, error: (data && data.error) || `http_${res.status}` };
+            } catch (e) {
+                return { ok: false, error: e.message || "Network error" };
+            }
+        }
+
         // ---------- operations (need key) ----------
         const apiKey = await getApiKeyForOps();
 
@@ -271,9 +352,47 @@ browser.runtime.onMessage.addListener((msg) => {
             return { ok: true, email };
         }
 
+        if (msg.type === "MAM_GENERATE_WITH_DOMAIN") {
+            const domain = String(msg.domain || "").trim().toLowerCase();
+            const useReadable = msg.useReadable !== false;
+            const customHandle = String(msg.customHandle || "").trim().toLowerCase();
+
+            let handle;
+            if (customHandle) {
+                if (!isValidCustomHandle(customHandle)) {
+                    throw new Error("Custom alias name can only use a-z, 0-9, dots, underscores, or hyphens (max 64).");
+                }
+                handle = customHandle;
+            } else if (useReadable) {
+                const words = await getDictionary();
+                const w1 = pickRandom(words);
+                let w2 = pickRandom(words);
+                if (words.length > 1) {
+                    let guard = 0;
+                    while (w2 === w1 && guard++ < 10) w2 = pickRandom(words);
+                }
+                handle = `${w1}.${w2}`;
+            } else {
+                const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+                handle = "";
+                for (let i = 0; i < 12; i++) handle += chars[Math.floor(Math.random() * chars.length)];
+            }
+
+            let actualDomain = domain;
+            if (!actualDomain) {
+                const domains = await getDomains();
+                if (!domains.length) throw new Error("No domains available.");
+                actualDomain = pickRandom(domains);
+            }
+
+            const created = await createAlias(apiKey, handle, actualDomain);
+            const email = (created && (created.alias || created.address)) || `${handle}@${actualDomain}`;
+            return { ok: true, email };
+        }
+
         if (msg.type === "MAM_LIST_ALIASES") {
-            const items = await listAliasesBg(apiKey);
-            return { ok: true, items: Array.isArray(items) ? items : [] };
+            const result = await listAliasesBg(apiKey);
+            return { ok: true, items: result.items, total: result.total };
         }
 
         if (msg.type === "MAM_GET_DOMAINS") {

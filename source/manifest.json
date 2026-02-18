@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Email Alias Manager (Free)",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "View, create and delete mail aliases using your API key.",
   "icons": {
     "16": "image/icon.png",

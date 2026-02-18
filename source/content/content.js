@@ -13,6 +13,9 @@
 
 const ICON_URL = browser.runtime.getURL("icons/icon-96.png");
 const KEY_UI_MODE = "uiMode"; // "buttons" | "icon"
+const KEY_OVERLAY_ENABLED = "overlayEnabled";
+const KEY_OVERLAY_MODE = "overlayMode";
+const KEY_OVERLAY_SITES = "overlaySites";
 
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
@@ -32,6 +35,188 @@ function setInputValue(input, value) {
 async function getUiMode() {
   const res = await browser.storage.local.get(KEY_UI_MODE);
   return res[KEY_UI_MODE] || "icon";
+}
+
+function normalizeHost(rawHost) {
+  const host = String(rawHost || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\.+$/g, "");
+
+  if (!host || host === "null" || host === "undefined") return "";
+  if (!/^[a-z0-9.-]+$/.test(host)) return "";
+  if (host.startsWith(".") || host.endsWith(".") || host.includes("..")) return "";
+  return host;
+}
+
+function toSpecialSiteKey(url) {
+  const protocol = String(url.protocol || "").toLowerCase();
+  const host = normalizeHost(url.hostname);
+  const pathname = url.pathname || "";
+
+  if (protocol === "about:") {
+    const tail = String(pathname || url.href.slice("about:".length) || "").trim();
+    return tail ? `about:${tail}` : "";
+  }
+
+  if (host) return `${protocol}//${host}${pathname}`;
+  if (pathname) return `${protocol}${pathname}`;
+  return protocol;
+}
+
+function normalizeOverlaySiteEntry(rawValue) {
+  if (typeof rawValue !== "string") return "";
+  const raw = rawValue.trim();
+  if (!raw) return "";
+
+  const lower = raw.toLowerCase();
+  if (lower === "null" || lower === "undefined") return "";
+
+  if (lower.startsWith("host:")) {
+    const host = normalizeHost(raw.slice(5));
+    return host ? `host:${host}` : "";
+  }
+
+  if (/^[a-z0-9.-]+$/i.test(raw)) {
+    const host = normalizeHost(raw);
+    return host ? `host:${host}` : "";
+  }
+
+  let parsedUrl = null;
+  try {
+    parsedUrl = new URL(raw);
+  } catch {
+    try {
+      parsedUrl = new URL(`https://${raw}`);
+    } catch {
+      return "";
+    }
+  }
+
+  const protocol = String(parsedUrl.protocol || "").toLowerCase();
+  if (protocol === "http:" || protocol === "https:") {
+    const host = normalizeHost(parsedUrl.hostname);
+    return host ? `host:${host}` : "";
+  }
+  if (protocol === "file:") {
+    const path = parsedUrl.pathname || "";
+    return path ? `file://${path}` : "";
+  }
+  return toSpecialSiteKey(parsedUrl);
+}
+
+function normalizeOverlaySites(values) {
+  if (!Array.isArray(values)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const entry of values) {
+    const normalized = normalizeOverlaySiteEntry(entry);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function sameValues(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function getCurrentSiteInfo() {
+  let parsedUrl = null;
+  try {
+    parsedUrl = new URL(location.href);
+  } catch {
+    return null;
+  }
+
+  const protocol = String(parsedUrl.protocol || "").toLowerCase();
+  if (protocol === "http:" || protocol === "https:") {
+    const host = normalizeHost(parsedUrl.hostname);
+    if (!host) return null;
+    const hostKey = `host:${host}`;
+    return { key: hostKey, host };
+  }
+  if (protocol === "file:") {
+    const path = parsedUrl.pathname || "";
+    if (!path) return null;
+    return { key: `file://${path}`, host: "" };
+  }
+
+  const key = toSpecialSiteKey(parsedUrl);
+  if (!key) return null;
+  return { key, host: normalizeHost(parsedUrl.hostname) };
+}
+
+function siteMatchesRule(siteInfo, rule) {
+  if (!siteInfo || !rule) return false;
+  if (rule.startsWith("host:")) {
+    const hostRule = rule.slice(5);
+    if (!siteInfo.host || !hostRule) return false;
+    return siteInfo.host === hostRule || siteInfo.host.endsWith(`.${hostRule}`);
+  }
+  return siteInfo.key === rule;
+}
+
+async function isOverlayAllowedOnSite() {
+  const res = await browser.storage.local.get([KEY_OVERLAY_ENABLED, KEY_OVERLAY_MODE, KEY_OVERLAY_SITES]);
+  const enabled = res[KEY_OVERLAY_ENABLED] !== false;
+  if (!enabled) return false;
+
+  const mode = res[KEY_OVERLAY_MODE] || "all";
+  if (mode === "all") return true;
+
+  const rawSites = Array.isArray(res[KEY_OVERLAY_SITES]) ? res[KEY_OVERLAY_SITES] : [];
+  const sites = normalizeOverlaySites(rawSites);
+  if (!sameValues(rawSites, sites)) {
+    await browser.storage.local.set({ [KEY_OVERLAY_SITES]: sites });
+  }
+
+  const siteInfo = getCurrentSiteInfo();
+  if (mode === "allowlist") {
+    if (!siteInfo) return false;
+    return sites.some(rule => siteMatchesRule(siteInfo, rule));
+  }
+  if (mode === "denylist") {
+    if (!siteInfo) return true;
+    return !sites.some(rule => siteMatchesRule(siteInfo, rule));
+  }
+  return true;
+}
+
+async function disableOnThisSite() {
+  const res = await browser.storage.local.get([KEY_OVERLAY_MODE, KEY_OVERLAY_SITES]);
+  const mode = res[KEY_OVERLAY_MODE] || "all";
+  let sites = normalizeOverlaySites(Array.isArray(res[KEY_OVERLAY_SITES]) ? res[KEY_OVERLAY_SITES] : []);
+  const siteInfo = getCurrentSiteInfo();
+
+  if (!siteInfo || !siteInfo.key) {
+    return { ok: false, message: "This page cannot be added to overlay site rules." };
+  }
+
+  if (mode === "allowlist") {
+    const before = sites.length;
+    sites = sites.filter(rule => !siteMatchesRule(siteInfo, rule));
+    if (sites.length === before) {
+      return { ok: false, message: "This page is not currently enabled by your allowlist." };
+    }
+  } else {
+    if (!sites.includes(siteInfo.key)) sites.push(siteInfo.key);
+  }
+  const patch = { [KEY_OVERLAY_SITES]: sites };
+  if (mode === "all") patch[KEY_OVERLAY_MODE] = "denylist";
+  await browser.storage.local.set(patch);
+
+  // Remove all MAM hosts from page
+  document.querySelectorAll('[data-mam-host]').forEach(el => el.remove());
+  document.querySelectorAll('[data-mam-portal]').forEach(el => el.remove());
+  document.querySelectorAll('input[data-mam-bound]').forEach(el => el.removeAttribute('data-mam-bound'));
+  return { ok: true };
 }
 
 /* ---------------- Global portal (fixed menu) ---------------- */
@@ -267,30 +452,85 @@ const Portal = (() => {
         font-size: 11px !important;
         margin-top: 2px !important;
       }
+
+      .mam-disable{
+        all: unset !important;
+        display: block !important;
+        width: 100% !important;
+        text-align: center !important;
+        margin-top: 12px !important;
+        padding: 6px 0 !important;
+        color: #8b949e !important;
+        font-size: 11px !important;
+        cursor: pointer !important;
+        transition: color 0.15s !important;
+        border-top: 1px solid rgba(255,255,255,0.06) !important;
+        padding-top: 12px !important;
+      }
+      .mam-disable:hover{ color: #f85149 !important; }
     `;
 
     const layer = document.createElement("div");
     layer.className = "mam-layer";
-    layer.innerHTML = `
-      <div class="mam-menu mam-hidden" role="dialog" aria-label="Mail Alias Manager">
-        <div class="mam-head">
-          <div class="mam-title">Mail Alias Manager</div>
-          <button class="mam-close" type="button" title="Close">×</button>
-        </div>
 
-        <div class="mam-row">
-          <button class="mam-btn" type="button" data-act="gen">Generate alias</button>
-          <button class="mam-btn" type="button" data-act="choose">Choose alias</button>
-        </div>
+    const menu = document.createElement("div");
+    menu.className = "mam-menu mam-hidden";
+    menu.setAttribute("role", "dialog");
+    menu.setAttribute("aria-label", "Mail Alias Manager");
 
-        <div class="mam-muted mam-status"></div>
+    const head = document.createElement("div");
+    head.className = "mam-head";
+    const title = document.createElement("div");
+    title.className = "mam-title";
+    title.textContent = "Mail Alias Manager";
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "mam-close";
+    closeBtn.type = "button";
+    closeBtn.title = "Close";
+    closeBtn.textContent = "\u00d7";
+    head.appendChild(title);
+    head.appendChild(closeBtn);
 
-        <div class="mam-choose mam-hidden">
-          <input class="mam-input" type="text" placeholder="Search aliases..." />
-          <div class="mam-list"></div>
-        </div>
-      </div>
-    `;
+    const btnRow = document.createElement("div");
+    btnRow.className = "mam-row";
+    const genBtn = document.createElement("button");
+    genBtn.className = "mam-btn";
+    genBtn.type = "button";
+    genBtn.dataset.act = "gen";
+    genBtn.textContent = "Generate & insert";
+    const chooseBtn = document.createElement("button");
+    chooseBtn.className = "mam-btn";
+    chooseBtn.type = "button";
+    chooseBtn.dataset.act = "choose";
+    chooseBtn.textContent = "Choose existing";
+    btnRow.appendChild(genBtn);
+    btnRow.appendChild(chooseBtn);
+
+    const status = document.createElement("div");
+    status.className = "mam-muted mam-status";
+
+    const chooseBox = document.createElement("div");
+    chooseBox.className = "mam-choose mam-hidden";
+    const searchInput = document.createElement("input");
+    searchInput.className = "mam-input";
+    searchInput.type = "text";
+    searchInput.placeholder = "Search aliases...";
+    const listDiv = document.createElement("div");
+    listDiv.className = "mam-list";
+    chooseBox.appendChild(searchInput);
+    chooseBox.appendChild(listDiv);
+
+    const disableBtn = document.createElement("button");
+    disableBtn.className = "mam-disable";
+    disableBtn.type = "button";
+    disableBtn.textContent = "Disable on this site";
+
+    menu.appendChild(head);
+    menu.appendChild(btnRow);
+    menu.appendChild(status);
+    menu.appendChild(chooseBox);
+    menu.appendChild(disableBtn);
+    layer.appendChild(menu);
 
     shadow.appendChild(style);
     shadow.appendChild(layer);
@@ -298,17 +538,26 @@ const Portal = (() => {
     // cache nodes
     ui = {
       layer,
-      menu: layer.querySelector(".mam-menu"),
-      close: layer.querySelector(".mam-close"),
-      status: layer.querySelector(".mam-status"),
-      chooseBox: layer.querySelector(".mam-choose"),
-      search: layer.querySelector(".mam-choose .mam-input"),
-      list: layer.querySelector(".mam-list"),
+      menu,
+      close: closeBtn,
+      status,
+      chooseBox,
+      search: searchInput,
+      list: listDiv,
     };
 
-    ui.close.addEventListener("click", () => closeMenu());
+    closeBtn.addEventListener("click", () => closeMenu());
 
-    ui.menu.addEventListener("click", async (ev) => {
+    disableBtn.addEventListener("click", async () => {
+      const res = await disableOnThisSite();
+      if (!res?.ok) {
+        setStatus(res?.message || "Could not update overlay site settings.");
+        return;
+      }
+      closeMenu();
+    });
+
+    menu.addEventListener("click", async (ev) => {
       const btn = ev.target.closest("[data-act]");
       if (!btn) return;
 
@@ -399,8 +648,8 @@ const Portal = (() => {
     if (!res || !res.ok) throw new Error(res?.error || "Failed to generate alias.");
 
     setInputValue(targetInput, res.email);
-    setStatus("Inserted into the field.");
-    setTimeout(closeMenu, 550);
+    setStatus(`Inserted: ${res.email}`);
+    setTimeout(closeMenu, 800);
   }
 
   function renderAliases(items, q) {
@@ -611,6 +860,7 @@ function attachUi(input, mode) {
       color: #4d5257 !important;
       font-size: 10px !important;
       font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    }
     /* Group Container (Pill) */
     .mam-group {
       display: inline-flex !important;
@@ -785,6 +1035,9 @@ function attachUi(input, mode) {
 }
 
 async function scanAndAttach() {
+  const allowed = await isOverlayAllowedOnSite();
+  if (!allowed) return;
+
   const mode = await getUiMode();
   const inputs = Array.from(document.querySelectorAll('input[type="email"]'));
   for (const input of inputs) attachUi(input, mode);

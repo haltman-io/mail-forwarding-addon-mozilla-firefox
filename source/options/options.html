@@ -13,25 +13,23 @@
     <header class="head">
       <div>
         <h1>Settings</h1>
-        <p class="muted">
-          Adjust the API-Key, the UI mode in forms, and (optionally) enable a password lock.
-        </p>
+        <p class="muted">Configure your API key, default domain, overlay behavior, and security.</p>
       </div>
     </header>
 
     <!-- API KEY -->
     <section class="card">
-      <div class="cardTitle">API-Key</div>
+      <div class="cardTitle">API Key</div>
       <div class="cardSub">
-        Used to authenticate API calls to <span class="mono">mail.haltman.io</span>.
+        Authenticates requests to <span class="mono">mail.haltman.io</span>.
+        Your key is stored locally on this device.
       </div>
 
       <label class="lbl" for="apiKey">Key</label>
-      <input id="apiKey" class="input" type="password" placeholder="64 characters (a-z0-9)" autocomplete="off" />
+      <input id="apiKey" class="input" type="password" placeholder="64 characters (a–z, 0–9)" autocomplete="off" />
 
       <div class="row">
-        <button id="save" class="btn primary">Save</button>
-        <button id="clear" class="btn danger">Remove</button>
+        <button id="save" class="btn primary">Save key</button>
       </div>
 
       <div id="msg" class="toast hidden"></div>
@@ -41,7 +39,7 @@
     <section class="card">
       <div class="cardTitle">Default domain</div>
       <div class="cardSub">
-        Used as the preselected domain in the Create tab.
+        Pre-selected domain when generating aliases.
       </div>
 
       <label class="lbl" for="defaultDomain">Domain</label>
@@ -49,21 +47,53 @@
         <option value="">Use last selection</option>
       </select>
 
-      <div class="help">
-        Choose a domain to preselect in Create. Leave empty to use the last selected domain.
-      </div>
-
       <div id="domainMsg" class="toast hidden"></div>
       <div id="domainErr" class="alert hidden"></div>
     </section>
 
+    <!-- OVERLAY -->
+    <section class="card">
+      <div class="cardTitle">Input overlay</div>
+      <div class="cardSub">
+        Control where the email helper appears on pages with email input fields.
+      </div>
+
+      <div class="toggle-row" style="margin-top:16px">
+        <span class="toggle-label">Show overlay on email fields</span>
+        <label class="switch">
+          <input id="overlayEnabled" type="checkbox" checked />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div id="overlaySettings">
+        <label class="lbl" for="overlayMode">Where to show it</label>
+        <select id="overlayMode" class="select">
+          <option value="all">Show on all sites (default)</option>
+          <option value="allowlist">Only on selected sites</option>
+          <option value="denylist">Hide on selected sites</option>
+        </select>
+
+        <div id="siteListSection" class="hidden">
+          <label class="lbl" for="siteInput">Sites</label>
+          <div class="site-input-row">
+            <input id="siteInput" class="input" type="text" placeholder="e.g. github.com or file:///home/me/form.html" autocomplete="off" />
+            <button id="btnAddSite" class="btn">Add</button>
+          </div>
+          <div class="help">For web pages, add a domain. For local files or special pages, add the full URL.</div>
+          <ul id="siteList" class="site-list"></ul>
+        </div>
+      </div>
+
+      <div id="overlayMsg" class="toast hidden"></div>
+    </section>
+
     <!-- SECURITY -->
     <section class="card">
-      <div class="cardTitle">Security (Password lock)</div>
+      <div class="cardTitle">Password lock</div>
       <div class="cardSub">
-        When enabled, the API-Key is <b>not stored in plaintext</b> in <span class="mono">storage.local</span>.
-        It is stored encrypted with <span class="mono">PBKDF2 + AES-256-GCM</span>.
-        The password is <b>never</b> stored.
+        When enabled, your API key is encrypted with <span class="mono">PBKDF2 + AES-256-GCM</span> instead of stored in plaintext.
+        The password is never saved.
       </div>
 
       <div class="grid2">
@@ -96,6 +126,30 @@
       <div id="secErr" class="alert hidden"></div>
     </section>
 
+    <!-- DANGER ZONE -->
+    <section class="card card-danger">
+      <div class="cardTitle">Danger zone</div>
+      <div class="cardSub">These actions are irreversible on this device.</div>
+
+      <div class="row">
+        <button id="btnDisconnect" class="btn danger">Disconnect extension</button>
+      </div>
+      <div class="help">Removes your API key and all local data. Your aliases on the server are not affected.</div>
+
+      <div id="dangerMsg" class="toast hidden"></div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="card card-subtle">
+      <div class="cardTitle">About</div>
+      <div class="cardSub">
+        Email Alias Manager for Firefox — by
+        <a href="https://haltman.io" target="_blank" rel="noopener" class="link">haltman.io</a>.
+        <br />
+        Requests go only to <span class="mono">mail.haltman.io</span>.
+        No analytics. No tracking.
+      </div>
+    </section>
   </div>
 
   <script type="module" src="./options.js"></script>

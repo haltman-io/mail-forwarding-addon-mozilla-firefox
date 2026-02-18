@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -9,147 +9,244 @@
 
   <body>
     <div class="app">
-      <!-- Top bar -->
-      <header class="top">
-        <div class="brand">
-          <div class="brandText">
-            <div class="brandTitle">Email Alias Manager</div>
-            <div class="brandSub">Powered by <b>haltman.io</b>.</div>
-          </div>
+      <!-- Header -->
+      <header class="header">
+        <div class="header-brand">
+          <svg class="header-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <span class="header-title">Email Alias Manager</span>
         </div>
-
-<div class="topActions">
-  <button id="btnLock" class="iconBtn hidden" title="Lock/Unlock" aria-label="Lock/Unlock">🔒</button>
-  <button id="btnRefresh" class="iconBtn" title="Refresh" aria-label="Refresh">⟲</button>
-  <button id="btnOptions" class="iconBtn" title="Settings" aria-label="Settings">⚙</button>
-</div>
-
+        <div class="header-actions">
+          <button id="btnLock" class="icon-btn hidden" title="Lock session" aria-label="Lock session">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </button>
+          <button id="btnRefresh" class="icon-btn" title="Refresh data" aria-label="Refresh data">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+          </button>
+          <button id="btnSettings" class="icon-btn" title="Settings" aria-label="Settings">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
       </header>
 
-      <!-- Setup (first-run) -->
-      <section id="setup" class="panel hidden">
-        <div class="panelHead">
-          <div>
-            <div class="hTitle">First run</div>
-            <div class="hSub">Provide your API key to manage aliases.</div>
+      <!-- Snackbar -->
+      <div id="snackbar" class="snackbar hidden" role="status" aria-live="polite"></div>
+
+      <!-- ===== CONNECT (onboarding) ===== -->
+      <section id="viewConnect" class="view hidden">
+        <h2 class="view-title">Connect to Haltman Mail</h2>
+        <p class="view-desc">This extension needs an API key to create and manage email aliases on your behalf.</p>
+
+        <div class="trust-list">
+          <div class="trust-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Your key is stored locally on this device</span>
+          </div>
+          <div class="trust-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>Requests go only to <b>mail.haltman.io</b></span>
+          </div>
+          <div class="trust-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            <span>Clipboard access is used only to copy aliases</span>
           </div>
         </div>
 
+        <a id="btnGetKey" class="btn btn-secondary btn-full" href="https://mail.haltman.io" target="_blank" rel="noopener">
+          Open dashboard to get key
+        </a>
+
+        <div class="connect-divider">
+          <span class="connect-divider-line"></span>
+          <span class="connect-divider-text">or request a new key</span>
+          <span class="connect-divider-line"></span>
+        </div>
+
         <div class="field">
-          <label class="label" for="apiKeyInput">API-Key</label>
-          <input
-            id="apiKeyInput"
-            class="input"
-            type="password"
-            placeholder="64 chars (a-z0-9)"
-            autocomplete="off"
-          />
-          <div class="help">The key is saved locally (storage.local)..</div>
+          <label for="credentialEmail" class="field-label">Your email address</label>
+          <input id="credentialEmail" class="field-input" type="email" placeholder="you@example.com" autocomplete="email" />
+          <div id="credentialEmailHint" class="field-hint"></div>
         </div>
 
-        <div class="row">
-          <button id="btnSaveKey" class="btn primary">Save</button>
+        <div class="field">
+          <label for="credentialDays" class="field-label">Key validity (days)</label>
+          <input id="credentialDays" class="field-input" type="number" min="1" max="90" value="30" autocomplete="off" />
+          <div id="credentialDaysHint" class="field-hint"></div>
         </div>
 
-        <div id="setupErr" class="alert hidden"></div>
+        <button id="btnRequestKey" class="btn btn-secondary btn-full" disabled>
+          <span id="btnRequestKeyText">Request API key</span>
+          <span id="btnRequestKeySpinner" class="spinner hidden"></span>
+        </button>
+        <div id="credentialSuccess" class="alert alert-success hidden" role="status"></div>
+        <div id="credentialErr" class="alert hidden"></div>
+
+        <div class="connect-divider">
+          <span class="connect-divider-line"></span>
+          <span class="connect-divider-text">already have a key?</span>
+          <span class="connect-divider-line"></span>
+        </div>
+
+        <div class="field">
+          <label for="connectKeyInput" class="field-label">Paste your API key</label>
+          <input id="connectKeyInput" class="field-input" type="password" placeholder="64-character key (a–z, 0–9)" autocomplete="off" />
+          <div id="connectKeyHint" class="field-hint"></div>
+        </div>
+
+        <button id="btnConnect" class="btn btn-primary btn-full" disabled>
+          <span id="btnConnectText">Connect</span>
+          <span id="btnConnectSpinner" class="spinner hidden"></span>
+        </button>
+        <div id="connectErr" class="alert hidden"></div>
       </section>
 
-      <section id="unlock" class="panel hidden">
-        <div class="panelHead">
-          <div>
-            <div class="hTitle">Locked</div>
-            <div class="hSub">Enter your password to unlock this session.</div>
+      <!-- ===== CONNECTED (success) ===== -->
+      <section id="viewConnected" class="view hidden">
+        <div class="success-block">
+          <div class="success-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
           </div>
+          <h2 class="view-title">Connected</h2>
+          <p class="view-desc">Your API key has been verified. You're ready to create aliases.</p>
         </div>
+        <button id="btnStartUsing" class="btn btn-primary btn-full">Start generating aliases</button>
+        <button id="btnSetupLock" class="btn btn-link">Set up password lock →</button>
+      </section>
+
+      <!-- ===== UNLOCK ===== -->
+      <section id="viewUnlock" class="view hidden">
+        <h2 class="view-title">Session locked</h2>
+        <p class="view-desc">Enter your password to continue.</p>
 
         <div class="field">
-          <label class="label" for="unlockPassword">Password</label>
-          <input id="unlockPassword" class="input" type="password" autocomplete="off" />
+          <label for="unlockPassword" class="field-label">Password</label>
+          <input id="unlockPassword" class="field-input" type="password" autocomplete="off" />
         </div>
 
-        <div class="row">
-          <button id="btnUnlock" class="btn primary wide">Unlock</button>
-        </div>
-
+        <button id="btnUnlock" class="btn btn-primary btn-full">Unlock</button>
         <div id="unlockErr" class="alert hidden"></div>
       </section>
 
-
-      <!-- Main -->
-      <section id="main" class="panel hidden">
-        <!-- Tabs -->
-        <div class="tabs" role="tablist" aria-label="Alias tabs">
-          <button id="tabCreate" class="tab active" role="tab" aria-selected="true">Create</button>
-          <button id="tabList" class="tab" role="tab" aria-selected="false">Aliases</button>
+      <!-- ===== MAIN ===== -->
+      <section id="viewMain" class="view hidden">
+        <!-- Loading skeleton -->
+        <div id="mainLoading" class="loading-state hidden">
+          <div class="skeleton"></div>
+          <div class="skeleton skeleton-short"></div>
+          <div class="skeleton skeleton-btn"></div>
+          <div class="skeleton skeleton-link"></div>
         </div>
 
+        <!-- Tabs -->
+        <div class="tabs" role="tablist" aria-label="Mode">
+          <button id="tabGenerate" class="tab active" role="tab" aria-selected="true" aria-controls="panelGenerate">
+            <span class="tab-label">Generate</span>
+          </button>
+          <button id="tabChoose" class="tab" role="tab" aria-selected="false" aria-controls="panelChoose">
+            <span class="tab-label">Choose</span>
+            <span id="tabChooseCount" class="tab-count" aria-live="polite">0</span>
+          </button>
+        </div>
+
+        <!-- Error bar -->
         <div id="appErr" class="alert hidden"></div>
 
-        <!-- CREATE TAB -->
-        <div id="viewCreate" class="view">
-          <div class="card">
-            <div class="cardTitle">New alias</div>
-            <div class="cardSub">Create an alias using an allowed domain.</div>
+        <!-- ── Generate tab ── -->
+        <div id="panelGenerate" class="tab-panel" role="tabpanel" aria-labelledby="tabGenerate">
+          <div class="generate-stack">
+            <div class="field field-domain">
+              <label class="field-label" for="domainInput">Domain</label>
+              <div class="combobox" id="domainCombobox">
+                <div class="combobox-input-wrap">
+                  <input id="domainInput" class="field-input combobox-input" type="text" placeholder="Select or search domains…" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="domainDropdown" />
+                  <svg class="combobox-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+                <div id="domainDropdown" class="combobox-dropdown hidden" role="listbox"></div>
+              </div>
+              <div id="domainRequiredHint" class="field-hint invalid" role="status" aria-live="polite"></div>
+            </div>
 
-            <div class="grid2">
-              <div class="field">
-                <label class="label" for="handleInput">Handle</label>
-                <input id="handleInput" class="input" type="text" placeholder="hacker" autocomplete="off" />
-                <div class="help">Lowercase recommended.</div>
+            <button id="btnGenerateCopy" class="btn btn-primary btn-full btn-lg" disabled>
+              <span id="btnGenText">Generate &amp; Copy</span>
+              <span id="btnGenSpinner" class="spinner hidden"></span>
+            </button>
+
+            <button id="btnMoreOptions" class="btn btn-link more-toggle" aria-expanded="false">
+              More options
+              <svg class="more-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+
+            <div id="moreOptions" class="more-options hidden">
+              <div class="more-group more-group-style">
+                <div class="more-group-head">
+                  <div class="toggle-label-wrap">
+                    <span class="toggle-label">Alias style</span>
+                    <button
+                      id="aliasStyleInfo"
+                      class="info-tip"
+                      type="button"
+                      title="Readable words are easier to remember. Random aliases are harder to guess."
+                      aria-label="Alias style help"
+                    >?</button>
+                  </div>
+                </div>
+                <p class="inline-help">Readable words are easier to remember (for example, <span class="mono">blue.forest</span>). Random aliases are harder to guess (for example, <span class="mono">k7p3x9m2</span>).</p>
+                <div class="toggle-group" role="radiogroup" aria-label="Alias style">
+                  <button id="toggleReadable" class="toggle-btn active" role="radio" aria-checked="true" data-value="readable">Readable words</button>
+                  <button id="toggleRandom" class="toggle-btn" role="radio" aria-checked="false" data-value="random">Random</button>
+                </div>
               </div>
 
-            <div class="field">
-              <label class="label" for="domainSelect">Domain</label>
-              <select id="domainSelect" class="select">
-                <option value="" selected disabled>Select a domain</option>
-              </select>
-              <div class="help">Only allowed domains appear here.</div>
-            </div>
+              <div class="more-group more-group-custom">
+                <div class="field">
+                  <label for="customHandle" class="field-label">Custom alias name (optional)</label>
+                  <p class="inline-help">Choose the part before <span class="mono">@</span>. Leave blank to auto-generate.</p>
+                  <input id="customHandle" class="field-input" type="text" placeholder="e.g. newsletter-signup" autocomplete="off" aria-describedby="customHandleHint handlePreview" />
+                  <div id="customHandleHint" class="field-hint"></div>
+                </div>
+              </div>
 
-            </div>
+              <div class="more-group more-group-preview">
+                <div id="handlePreview" class="field-hint preview-hint"></div>
+              </div>
 
-            <div class="row">
-              <button id="btnCreate" class="btn primary wide">Create alias</button>
-            </div>
-            <div class="row">
-              <button id="btnGenRandom" class="btn wide">Generate random alias</button>
-            </div>
-
-
-            <div id="createMsg" class="toast hidden"></div>
-          </div>
-
-          <div class="card subtle">
-            <div class="mono small">
-              API: <span class="muted">https://mail.haltman.io</span>
+              <div class="more-group more-group-action">
+                <button id="btnCreateCustom" class="btn btn-secondary btn-full">Create custom alias</button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- LIST TAB -->
-        <div id="viewList" class="view hidden">
-          <div class="card">
-            <div class="row between">
-              <div>
-                <div class="cardTitle">Your aliases</div>
-                <div class="cardSub">Search and delete.</div>
-              </div>
-              <div id="count" class="pill muted"></div>
-            </div>
-
-            <div class="field" style="margin-top:10px">
-              <label class="label" for="searchInput">Search</label>
-              <input id="searchInput" class="input" type="text" placeholder="type: segfault / proton / handle…" autocomplete="off" />
-            </div>
-
-            <div id="list" class="list"></div>
+        <!-- ── Choose tab ── -->
+        <div id="panelChoose" class="tab-panel hidden" role="tabpanel" aria-labelledby="tabChoose">
+          <div class="field">
+            <input id="searchInput" class="field-input" type="text" placeholder="Search by alias, domain, or destination…" autocomplete="off" aria-label="Search aliases" />
           </div>
 
-          <div class="row">
-            <button id="btnLogout" class="btn danger wide">Remove API-Key</button>
+          <div id="chooseMeta" class="choose-meta hidden" role="status" aria-live="polite"></div>
+
+          <div id="aliasListShell" class="alias-list-shell">
+            <div id="aliasList" class="alias-list"></div>
+          </div>
+
+          <div id="emptyState" class="empty-state hidden">
+            <p>No aliases yet</p>
+            <button id="btnEmptyGenerate" class="btn btn-secondary">Generate your first alias</button>
           </div>
         </div>
       </section>
+
+      <!-- Delete confirmation modal -->
+      <div id="deleteModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Confirm deletion">
+        <div class="modal">
+          <h3 class="modal-title">Delete alias?</h3>
+          <p id="deleteModalAlias" class="modal-desc mono"></p>
+          <p class="modal-warn">This action cannot be undone.</p>
+          <div class="modal-actions">
+            <button id="btnDeleteCancel" class="btn btn-secondary">Cancel</button>
+            <button id="btnDeleteConfirm" class="btn btn-danger">Delete</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="./popup.js"></script>
