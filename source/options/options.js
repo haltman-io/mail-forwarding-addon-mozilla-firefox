@@ -339,7 +339,7 @@ async function disableLockFlow() {
   try {
     setErr(els.secErr, "");
     const pass = els.disablePassword?.value || "";
-    if (pass.length < 6) return setErr(els.secErr, "Password too short.");
+    if (pass.length < 8) return setErr(els.secErr, "Password must be at least 8 characters.");
 
     const payload = await getApiKeyEncPayload();
     if (!payload) return setErr(els.secErr, "No encrypted key found.");

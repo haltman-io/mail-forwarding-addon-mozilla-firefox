@@ -30,10 +30,17 @@ const DICTIONARY_URL = browser.runtime.getURL("data/dictionary.json");
 const KEY_API_KEY = "apiKey";
 
 const MENU_ID = "generate-random-alias";
+const REQUEST_TIMEOUT_MS = 30000;
 
 // ---------- utils ----------
+function secureRandomIndex(length) {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] % length;
+}
+
 function pickRandom(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
+    return arr[secureRandomIndex(arr.length)];
 }
 
 function normalizeWord(s) {
@@ -81,7 +88,7 @@ async function getDictionary() {
 }
 
 async function getDomains() {
-    const data = await fetchJson(`${BASE_URL}/domains`, { method: "GET" });
+    const data = await fetchJson(`${BASE_URL}/api/domains`, { method: "GET", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     if (!Array.isArray(data)) throw new Error("Invalid /domains response.");
     return data.map(d => String(d).trim().toLowerCase()).filter(Boolean);
 }
@@ -104,7 +111,8 @@ async function createAlias(apiKey, aliasHandle, aliasDomain) {
             "X-API-Key": apiKey,
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ alias_handle: aliasHandle, alias_domain: aliasDomain })
+        body: JSON.stringify({ alias_handle: aliasHandle, alias_domain: aliasDomain }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
     });
 
     const text = await res.text();
@@ -130,7 +138,8 @@ async function deleteAlias(apiKey, aliasEmail) {
       "X-API-Key": apiKey,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ alias: aliasEmail })
+    body: JSON.stringify({ alias: aliasEmail }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
 
   const text = await res.text();
@@ -151,34 +160,19 @@ async function deleteAlias(apiKey, aliasEmail) {
 
 
 async function copyToClipboardViaTab(tabId, text) {
-    // MV2: usa tabs.executeScript
-    const code = `
-    (async () => {
-      const t = ${JSON.stringify(text)};
-      try {
-        await navigator.clipboard.writeText(t);
-        true;
-      } catch (e) {
-        try {
-          const ta = document.createElement("textarea");
-          ta.value = t;
-          ta.style.position = "fixed";
-          ta.style.top = "-9999px";
-          ta.style.left = "-9999px";
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          const ok = document.execCommand("copy");
-          document.body.removeChild(ta);
-          ok;
-        } catch (e2) {
-          false;
-        }
-      }
-    })();
-  `;
-
-    await browser.tabs.executeScript(tabId, { code });
+    // MV2: use tabs.executeScript with a safe static script + message passing
+    // instead of injecting user data into a code string.
+    const listener = (message) => {
+        if (message?.type === "MAM_CLIPBOARD_REQUEST") return Promise.resolve({ text });
+    };
+    browser.runtime.onMessage.addListener(listener);
+    try {
+        await browser.tabs.executeScript(tabId, {
+            code: `(async()=>{try{const r=await browser.runtime.sendMessage({type:"MAM_CLIPBOARD_REQUEST"});if(r&&r.text)await navigator.clipboard.writeText(r.text);}catch{}})();`
+        });
+    } finally {
+        browser.runtime.onMessage.removeListener(listener);
+    }
 }
 
 async function notify(title, message) {
@@ -233,7 +227,8 @@ async function listAliasesBg(apiKey) {
 
         const res = await fetch(url.href, {
             method: "GET",
-            headers: { "X-API-Key": apiKey }
+            headers: { "X-API-Key": apiKey },
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
         });
 
         const text = await res.text();
@@ -305,7 +300,8 @@ browser.runtime.onMessage.addListener((msg) => {
                 const res = await fetch(`${BASE_URL}/api/credentials/create`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, days })
+                    body: JSON.stringify({ email, days }),
+                    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
                 });
                 const text = await res.text();
                 let data = null;
@@ -330,7 +326,8 @@ browser.runtime.onMessage.addListener((msg) => {
                 url.searchParams.set("offset", "0");
                 const res = await fetch(url.href, {
                     method: "GET",
-                    headers: { "X-API-Key": key }
+                    headers: { "X-API-Key": key },
+                    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
                 });
                 if (res.ok) {
                     return { ok: true, verified: true };
@@ -375,7 +372,7 @@ browser.runtime.onMessage.addListener((msg) => {
             } else {
                 const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
                 handle = "";
-                for (let i = 0; i < 12; i++) handle += chars[Math.floor(Math.random() * chars.length)];
+                for (let i = 0; i < 12; i++) handle += chars[secureRandomIndex(chars.length)];
             }
 
             let actualDomain = domain;

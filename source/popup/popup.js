@@ -116,6 +116,7 @@ let comboboxHighlightIndex = -1;
 let comboboxRenderToken = 0;
 let aliasListWired = false;
 let isGenerating = false;
+let domainsLoaded = false;
 
 const CUSTOM_HANDLE_MAX_LEN = 64;
 const CUSTOM_HANDLE_ALLOWED_RE = /^[a-z0-9._-]+$/;
@@ -242,10 +243,12 @@ async function loadDomains() {
   const cached = await getDomainsCache();
   if (cached && Array.isArray(cached.items) && typeof cached.ts === "number" && Date.now() - cached.ts < TTL) {
     DOMAINS = cached.items;
+    domainsLoaded = true;
     return;
   }
   const res = await bg({ type: "MAM_GET_DOMAINS" });
   DOMAINS = (Array.isArray(res.items) ? res.items : []).map(d => norm(d)).filter(Boolean);
+  domainsLoaded = true;
   await setDomainsCache(DOMAINS);
 }
 
@@ -259,8 +262,15 @@ function updateGenerateButtonState() {
   }
   if (!el.domainRequiredHint) return;
   if (!selectedDomain) {
-    el.domainRequiredHint.textContent = "Choose a domain to continue.";
-    el.domainRequiredHint.className = "field-hint invalid";
+    if (!domainsLoaded) {
+      // Domains still loading — don't show any hint yet
+      el.domainRequiredHint.textContent = "";
+      el.domainRequiredHint.className = "field-hint";
+    } else {
+      // Domains loaded but none selected — show neutral guidance
+      el.domainRequiredHint.textContent = "Select a domain to get started.";
+      el.domainRequiredHint.className = "field-hint";
+    }
     return;
   }
   el.domainRequiredHint.textContent = "";
@@ -347,8 +357,8 @@ function moveComboboxHighlight(delta) {
 function updateChooseTabCount(filteredCount = ALIASES.length) {
   const total = ALIASES_TOTAL || ALIASES.length;
   const totalText = formatCount(total);
-  if (el.tabChooseCount) el.tabChooseCount.textContent = `(${totalText})`;
-  if (el.tabChoose) el.tabChoose.setAttribute("aria-label", `Choose aliases (${totalText})`);
+  if (el.tabChooseCount) el.tabChooseCount.textContent = total > 0 ? `(${totalText})` : "";
+  if (el.tabChoose) el.tabChoose.setAttribute("aria-label", total > 0 ? `Choose aliases (${totalText})` : "Choose aliases");
 
   if (!el.chooseMeta) return;
   const isFiltered = Number(filteredCount) !== Number(ALIASES.length);
@@ -535,6 +545,9 @@ async function initCombobox() {
     selectDomain(preferred, { rememberSelection: false });
   } else if (last && DOMAINS.includes(last)) {
     selectDomain(last, { rememberSelection: false });
+  } else if (DOMAINS.length > 0) {
+    // First-time user or previous domain no longer available — auto-select first
+    selectDomain(DOMAINS[0], { rememberSelection: false });
   } else {
     clearSelectedDomain({ keepInput: false });
   }
@@ -976,7 +989,7 @@ async function bootstrap() {
     try {
       setErr(el.unlockErr, "");
       const pass = el.unlockPassword?.value || "";
-      if (pass.length < 6) throw new Error("Password too short.");
+      if (pass.length < 8) throw new Error("Password must be at least 8 characters.");
 
       const payload = await getApiKeyEncPayload();
       if (!payload) throw new Error("No encrypted key found.");
@@ -1022,7 +1035,15 @@ async function bootstrap() {
   /* ──── Generate & Copy ──── */
 
   el.btnGenerateCopy?.addEventListener("click", async () => {
-    if (!selectedDomain) { snack("Choose a domain first.", "error"); return; }
+    if (!selectedDomain) {
+      snack("Select a domain first.", "error");
+      if (el.domainRequiredHint) {
+        el.domainRequiredHint.textContent = "A domain is required.";
+        el.domainRequiredHint.className = "field-hint invalid";
+      }
+      el.domainInput?.focus();
+      return;
+    }
 
     setErr(el.appErr, "");
     isGenerating = true;
@@ -1096,7 +1117,7 @@ async function bootstrap() {
       snack(validation.empty ? "Enter a custom alias name first" : validation.error, "error");
       return;
     }
-    if (!selectedDomain) { snack("Choose a domain first.", "error"); return; }
+    if (!selectedDomain) { snack("Select a domain first.", "error"); return; }
 
     setErr(el.appErr, "");
     try {
@@ -1139,10 +1160,13 @@ async function bootstrap() {
     if (e.target === el.deleteModal) closeDeleteModal();
   });
 
-  // Close modal on Escape
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !el.deleteModal?.classList.contains("hidden")) closeDeleteModal();
-  });
+  // Close modal on Escape (once — outside bootstrap to avoid stacking)
+  if (!document._mamEscapeWired) {
+    document._mamEscapeWired = true;
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !el.deleteModal?.classList.contains("hidden")) closeDeleteModal();
+    });
+  }
 
   updateGenerateButtonState();
   updateCustomHandleUI();

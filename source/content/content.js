@@ -703,7 +703,7 @@ const Portal = (() => {
 
     const items = Array.isArray(res.items) ? res.items : [];
     renderAliases(items, "");
-    setStatus(`${items.length} loaded.`);
+    setStatus(`${items.length} alias${items.length === 1 ? "" : "es"}`);
 
     ui.search.value = "";
     ui.search.focus();
@@ -1015,11 +1015,11 @@ function attachUi(input, mode) {
 
     const p1 = document.createElement("div");
     p1.className = "lbl-primary";
-    p1.textContent = "Mail Forwarding";
+    p1.textContent = "Email Alias Manager";
 
     const p2 = document.createElement("div");
     p2.className = "lbl-secondary";
-    p2.textContent = "by haltman.io";
+    p2.textContent = "haltman.io";
 
     lblBox.appendChild(p1);
     lblBox.appendChild(p2);

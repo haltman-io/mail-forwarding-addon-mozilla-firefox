@@ -7,6 +7,9 @@ const BASE_URL = "https://mail.haltman.io";
 /** @const {number} Default page size for paginated endpoints */
 const DEFAULT_PAGE_LIMIT = 50;
 
+/** @const {number} Request timeout in milliseconds */
+const REQUEST_TIMEOUT_MS = 30000;
+
 /**
  * Validates whether a string looks like a valid 64-char hex API key.
  * @param {string} k
@@ -64,7 +67,7 @@ async function parseResponse(res) {
  * @returns {Promise<string[]>}
  */
 export async function getDomains() {
-  const res = await fetch(`${BASE_URL}/domains`, { method: "GET" });
+  const res = await fetch(`${BASE_URL}/api/domains`, { method: "GET", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   const data = await parseResponse(res);
   if (!Array.isArray(data)) return [];
   return data.map(s => String(s).trim().toLowerCase()).filter(Boolean);
@@ -82,7 +85,8 @@ export async function createCredentials(email, days) {
   const res = await fetch(`${BASE_URL}/api/credentials/create`, {
     method: "POST",
     headers: buildHeaders(null, true),
-    body: JSON.stringify({ email, days })
+    body: JSON.stringify({ email, days }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
   return parseResponse(res);
 }
@@ -128,7 +132,8 @@ export async function listAliases(apiKey, { limit = DEFAULT_PAGE_LIMIT, offset =
 
   const res = await fetch(url.href, {
     method: "GET",
-    headers: buildHeaders(apiKey)
+    headers: buildHeaders(apiKey),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
 
   const data = await parseResponse(res);
@@ -169,7 +174,8 @@ export async function listAllAliases(apiKey, pageSize = DEFAULT_PAGE_LIMIT) {
 export async function getAliasStats(apiKey) {
   const res = await fetch(`${BASE_URL}/api/alias/stats`, {
     method: "GET",
-    headers: buildHeaders(apiKey)
+    headers: buildHeaders(apiKey),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
   return parseResponse(res);
 }
@@ -185,7 +191,8 @@ export async function createAlias(apiKey, aliasHandle, aliasDomain) {
   const res = await fetch(`${BASE_URL}/api/alias/create`, {
     method: "POST",
     headers: buildHeaders(apiKey, true),
-    body: JSON.stringify({ alias_handle: aliasHandle, alias_domain: aliasDomain })
+    body: JSON.stringify({ alias_handle: aliasHandle, alias_domain: aliasDomain }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
   return parseResponse(res);
 }
@@ -200,7 +207,8 @@ export async function deleteAlias(apiKey, alias) {
   const res = await fetch(`${BASE_URL}/api/alias/delete`, {
     method: "POST",
     headers: buildHeaders(apiKey, true),
-    body: JSON.stringify({ alias })
+    body: JSON.stringify({ alias }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
   return parseResponse(res);
 }
@@ -231,7 +239,8 @@ export async function getActivity(apiKey, { limit = DEFAULT_PAGE_LIMIT, offset =
 
   const res = await fetch(url.href, {
     method: "GET",
-    headers: buildHeaders(apiKey)
+    headers: buildHeaders(apiKey),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
 
   const data = await parseResponse(res);
