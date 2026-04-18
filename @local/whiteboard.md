@@ -37,17 +37,18 @@ Your API Token: <api-token>
 ```
 
 ## Network Endpoints Used
-- `GET https://mail.haltman.io/domains`
-- `GET https://mail.haltman.io/api/alias/list`
+- `GET  https://mail.haltman.io/api/domains`
+- `GET  https://mail.haltman.io/api/alias/list`
 - `POST https://mail.haltman.io/api/alias/create`
 - `POST https://mail.haltman.io/api/alias/delete`
+- `POST https://mail.haltman.io/api/credentials/create`
 
 ## Permission Notes (Why They Are Needed)
 - `storage`: saves API key, settings, domain cache, and encrypted payload.
 - `contextMenus`: adds “Email Alias Manager → Generate random alias”.
 - `notifications`: shows success/error messages after create/copy.
 - `clipboardWrite`: copies generated aliases to the clipboard.
-- `tabs` / `activeTab`: clipboard fallback via `tabs.executeScript`.
+- `activeTab`: clipboard fallback via `tabs.executeScript` on user-initiated action (context-menu click).
 - `<all_urls>` content script: injects UI next to email inputs only.
 - `https://mail.haltman.io/*`: API requests to the service.
 

@@ -3,6 +3,7 @@
   "name": "Email Alias Manager (Free)",
   "version": "0.1.3",
   "description": "View, create and delete mail aliases using your API key.",
+  "homepage_url": "https://mail.haltman.io",
   "icons": {
     "16": "image/icon.png",
     "32": "image/icon32.png",
@@ -26,7 +27,6 @@
   "permissions": [
     "storage",
     "contextMenus",
-    "tabs",
     "activeTab",
     "notifications",
     "clipboardWrite",
